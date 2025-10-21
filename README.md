@@ -1,72 +1,35 @@
 # Paginate-Cmd MCP Server
 
-A Model Context Protocol (MCP) server that executes shell commands with intelligent output pagination. Automatically handles large command outputs that would exceed Claude's context window by implementing page-based retrieval.
+A Model Context Protocol (MCP) server that prevents output truncation when working with large command outputs. Perfect for ensuring AI agents can access and analyze complete command results without hitting context limits.
 
-## Features
+## Why Use This?
 
-- Execute shell commands with full stdout/stderr capture
-- Automatic pagination for outputs exceeding 10,000 tokens
-- Page-based retrieval for large outputs (700 lines or 30KB per page)
-- No external dependencies beyond the MCP SDK
-- TypeScript implementation with full type safety
+When running shell commands that produce large outputs (like `git diff`, `git log`, `cat large_file.txt`, or test results), Claude and other AI agents often truncate the output or fail to process the entire content. This leads to incomplete analysis and missed information.
 
-## Installation
+Paginate-MCP solves this by:
+- **Preventing truncation** - Automatically handles outputs exceeding 10,000 tokens
+- **Preserving full context** - Ensures the agent can access all output through pagination
+- **Seamless integration** - Works transparently with your existing workflows
 
-### From npm (Recommended)
+## Setup
+
+### Claude Code
+
+Add this MCP server to Claude Code with a single command:
 
 ```bash
-npm install -g paginate-mcp
+claude mcp add paginate_mcp npx paginate-mcp@latest
 ```
 
-Or use with npx (no installation required):
+### Claude Desktop
+
+Use directly with npx without any installation:
 
 ```bash
 npx paginate-mcp
 ```
 
-### From Source
-
-```bash
-git clone https://github.com/andrelip/paginate-mcp.git
-cd paginate-mcp
-npm install
-npm run build
-```
-
-## Usage
-
-### With npx (Easiest)
-
-Use directly with npx without installing:
-
-```json
-{
-  "mcpServers": {
-    "paginate-mcp": {
-      "command": "npx",
-      "args": ["-y", "paginate-mcp"]
-    }
-  }
-}
-```
-
-### With Global Installation
-
-If you installed globally via `npm install -g paginate-mcp`:
-
-```json
-{
-  "mcpServers": {
-    "paginate-mcp": {
-      "command": "paginate-mcp"
-    }
-  }
-}
-```
-
-### With Claude Desktop (Local Build)
-
-Add to your Claude Desktop configuration file:
+Or add to your Claude Desktop or configuration:
 
 **MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -75,18 +38,33 @@ Add to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "paginate-mcp": {
-      "command": "node",
-      "args": ["/absolute/path/to/paginate-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "paginate-mcp@latest"]
     }
   }
 }
 ```
 
-### As a Standalone Server
+### Other MCP Clients
+
+Use directly with npx without any installation:
 
 ```bash
-npm start
+npx paginate-mcp
 ```
+
+## Example Usage
+
+Once configured, you can ask Claude questions that would normally result in truncated output:
+
+```
+Read git diff against origin/main using paginate-mcp and present me some suggestions to improve it
+```
+
+Other useful examples:
+- "Use paginate-mcp to run the full test suite and analyze all failures"
+- "Read the entire application log from yesterday using paginate-mcp and identify error patterns"
+- "Show me the complete git log for the last 100 commits using paginate-mcp"
 
 ## Tools
 
@@ -185,7 +163,37 @@ The server estimates tokens as `text.length * 0.25`. This is a conservative esti
 - `crypto` - UUID generation
 - `util` - Promise utilities
 
-## Architecture
+## How It Works
+
+```mermaid
+sequenceDiagram
+    participant Agent as AI Agent
+    participant MCP as Paginate-MCP Server
+    participant Shell as Shell Command
+    participant Storage as In-Memory Storage
+
+    Agent->>MCP: run_paginated_cmd("git log --all")
+    MCP->>Shell: Execute command
+    Shell-->>MCP: Full output (stdout/stderr)
+
+    alt Output < 10,000 tokens
+        MCP-->>Agent: Return complete output immediately
+    else Output > 10,000 tokens
+        MCP->>Storage: Store full output with UUID
+        MCP-->>Agent: Return {status: "paginated", output_id, total_pages}
+
+        loop For each page
+            Agent->>MCP: read_output_page(output_id, page_num)
+            MCP->>Storage: Retrieve page (700 lines)
+            Storage-->>MCP: Page content
+            MCP->>Storage: Mark page as read
+            MCP-->>Agent: Page content + metadata
+        end
+
+        Note over MCP,Storage: After all pages read
+        MCP->>Storage: Auto-cleanup output
+    end
+```
 
 The server maintains two in-memory data structures:
 
@@ -194,86 +202,13 @@ The server maintains two in-memory data structures:
 
 Storage is automatically cleaned up when all pages of an output have been read.
 
-## Publishing to npm
+## Features
 
-### First-time Setup
-
-1. **Create an npm account** at https://www.npmjs.com/signup if you don't have one
-
-2. **Login to npm** from your terminal:
-
-   ```bash
-   npm login
-   ```
-
-3. **Update package.json** with your details:
-   - Set `author` field to your name/email
-   - Update `repository.url` to your GitHub repository
-   - Update `homepage` and `bugs.url` URLs
-
-### Publishing
-
-1. **Ensure everything builds**:
-
-   ```bash
-   npm run build
-   ```
-
-2. **Test the package locally**:
-
-   ```bash
-   npm pack
-   # This creates a .tgz file you can test with: npm install -g ./paginate-mcp-1.0.0.tgz
-   ```
-
-3. **Publish to npm**:
-   ```bash
-   npm publish
-   ```
-
-### Publishing Updates
-
-1. **Update version** (use semantic versioning):
-
-   ```bash
-   npm version patch  # 1.0.0 -> 1.0.1 (bug fixes)
-   npm version minor  # 1.0.0 -> 1.1.0 (new features)
-   npm version major  # 1.0.0 -> 2.0.0 (breaking changes)
-   ```
-
-2. **Publish**:
-
-   ```bash
-   npm publish
-   ```
-
-3. **Push git tags**:
-   ```bash
-   git push --follow-tags
-   ```
-
-### Using npx After Publishing
-
-Once published, users can run your MCP server without installation:
-
-```bash
-npx paginate-mcp
-```
-
-Or in their Claude Desktop config:
-
-```json
-{
-  "mcpServers": {
-    "paginate-mcp": {
-      "command": "npx",
-      "args": ["-y", "paginate-mcp"]
-    }
-  }
-}
-```
-
-The `-y` flag auto-confirms npx prompts for a smoother experience.
+- Execute shell commands with full stdout/stderr capture
+- Automatic pagination for outputs exceeding 10,000 tokens
+- Page-based retrieval for large outputs (700 lines or 30KB per page)
+- No external dependencies beyond the MCP SDK
+- TypeScript implementation with full type safety
 
 ## License
 
