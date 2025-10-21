@@ -1,0 +1,58 @@
+{
+  "name": "paginate-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for executing shell commands with pagination support",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "paginate-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "command",
+    "executor",
+    "pagination",
+    "shell",
+    "cli",
+    "anthropic",
+    "claude"
+  ],
+  "author": "André Stephano",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andrelip/paginate-mcp.git"
+  },
+  "homepage": "https://github.com/andrelip/paginate-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/andrelip/paginate-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}
