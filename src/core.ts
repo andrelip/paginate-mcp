@@ -31,6 +31,14 @@ export interface PaginationResult {
   totalPages: number;
 }
 
+interface ExecError extends Error {
+  code?: number;
+  stdout?: string;
+  stderr?: string;
+  killed?: boolean;
+  signal?: string;
+}
+
 export function estimateTokens(text: string): number {
   return Math.floor(text.length * TOKEN_ESTIMATE_RATIO);
 }
@@ -39,7 +47,10 @@ function calculateTotalPages(lineCount: number): number {
   return Math.ceil(lineCount / PAGE_SIZE);
 }
 
-function calculatePageBoundaries(page: number, totalLines: number): [number, number] {
+function calculatePageBoundaries(
+  page: number,
+  totalLines: number,
+): [number, number] {
   const startIndex = (page - 1) * PAGE_SIZE;
   const endIndex = Math.min(startIndex + PAGE_SIZE, totalLines);
   return [startIndex, endIndex];
@@ -56,7 +67,9 @@ function applyCharacterLimit(lines: string[]): string[] {
   for (const line of lines) {
     const lineLength = line.length + 1;
 
-    if (shouldStopAddingLines(characterCount, lineLength, includedLines.length)) {
+    if (
+      shouldStopAddingLines(characterCount, lineLength, includedLines.length)
+    ) {
       break;
     }
 
@@ -70,24 +83,30 @@ function applyCharacterLimit(lines: string[]): string[] {
 function shouldStopAddingLines(
   currentCharCount: number,
   lineLength: number,
-  linesIncluded: number
+  linesIncluded: number,
 ): boolean {
   const wouldExceedLimit = currentCharCount + lineLength > MAX_CHARS_PER_PAGE;
   const hasAtLeastOneLine = linesIncluded > 0;
   return wouldExceedLimit && hasAtLeastOneLine;
 }
 
-function estimateTotalPagesFromCharacters(textLength: number, baseTotalPages: number): number {
+function estimateTotalPagesFromCharacters(
+  textLength: number,
+  baseTotalPages: number,
+): number {
   const estimatedPages = Math.floor(textLength / MAX_CHARS_PER_PAGE) + 1;
   return Math.max(baseTotalPages, estimatedPages);
 }
 
 function hitCharacterLimit(includedLines: string[]): boolean {
-  const totalChars = includedLines.reduce((sum, line) => sum + line.length + 1, 0);
+  const totalChars = includedLines.reduce(
+    (sum, line) => sum + line.length + 1,
+    0,
+  );
   return totalChars >= MAX_CHARS_PER_PAGE;
 }
 
-export function paginateText(text: string, page: number = 1): PaginationResult {
+export function paginateText(text: string, page = 1): PaginationResult {
   const lines = text.split("\n");
   const totalPages = calculateTotalPages(lines.length);
   const [startIndex, endIndex] = calculatePageBoundaries(page, lines.length);
@@ -101,27 +120,37 @@ export function paginateText(text: string, page: number = 1): PaginationResult {
   const pageContent = limitedLines.join("\n");
 
   if (hitCharacterLimit(limitedLines)) {
-    const adjustedTotalPages = estimateTotalPagesFromCharacters(text.length, totalPages);
-    return { content: pageContent, currentPage: page, totalPages: adjustedTotalPages };
+    const adjustedTotalPages = estimateTotalPagesFromCharacters(
+      text.length,
+      totalPages,
+    );
+    return {
+      content: pageContent,
+      currentPage: page,
+      totalPages: adjustedTotalPages,
+    };
   }
 
   return { content: pageContent, currentPage: page, totalPages };
 }
 
-function buildExecutionOptions(workingDir: string | undefined, timeout: number) {
+function buildExecutionOptions(
+  workingDir: string | undefined,
+  timeout: number,
+) {
   return {
     cwd: workingDir,
     timeout: timeout * MILLISECONDS_PER_SECOND,
     maxBuffer: ONE_GIGABYTE,
-    encoding: 'utf8' as const,
+    encoding: "utf8" as const,
   };
 }
 
-function wasCommandKilledByTimeout(error: any, timeout: number): boolean {
-  return error.killed && error.signal === "SIGTERM";
+function wasCommandKilledByTimeout(error: ExecError): boolean {
+  return error.killed === true && error.signal === "SIGTERM";
 }
 
-function hasExitCode(error: any): boolean {
+function hasExitCode(error: ExecError): boolean {
   return error.code !== undefined;
 }
 
@@ -133,32 +162,35 @@ function createSuccessResult(stdout: string, stderr: string): CommandResult {
   };
 }
 
-function createErrorResult(error: any): CommandResult {
+function createErrorResult(error: ExecError): CommandResult {
   return {
     stdout: error.stdout || "",
     stderr: error.stderr || "",
-    returnCode: error.code,
+    returnCode: error.code || 1,
   };
 }
 
 export async function executeCommand(
   command: string,
   workingDir?: string,
-  timeout: number = 30
+  timeout = 30,
 ): Promise<CommandResult> {
   try {
     const options = buildExecutionOptions(workingDir, timeout);
     const { stdout, stderr } = await execAsync(command, options);
     return createSuccessResult(stdout, stderr);
-  } catch (error: any) {
-    if (wasCommandKilledByTimeout(error, timeout)) {
+  } catch (error) {
+    const execError = error as ExecError;
+    if (wasCommandKilledByTimeout(execError)) {
       throw new Error(`Command timed out after ${timeout} seconds`);
     }
 
-    if (hasExitCode(error)) {
-      return createErrorResult(error);
+    if (hasExitCode(execError)) {
+      return createErrorResult(execError);
     }
 
-    throw new Error(`Failed to execute command: ${error.message}`);
+    throw new Error(
+      `Failed to execute command: ${execError.message || String(error)}`,
+    );
   }
 }

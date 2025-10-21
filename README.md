@@ -95,15 +95,18 @@ npm start
 Execute a shell command and capture its output.
 
 **Parameters:**
+
 - `command` (required): The shell command to execute
 - `working_directory` (optional): Working directory for command execution
 - `timeout` (optional): Timeout in seconds (default: 30)
 
 **Returns:**
+
 - If output < 10,000 tokens: Complete output immediately
 - If output > 10,000 tokens: Paginated response with `output_id` for retrieval
 
 **Example (small output):**
+
 ```json
 {
   "status": "complete",
@@ -115,6 +118,7 @@ Execute a shell command and capture its output.
 ```
 
 **Example (large output):**
+
 ```json
 {
   "status": "paginated",
@@ -134,10 +138,12 @@ Execute a shell command and capture its output.
 Retrieve a specific page of stored command output.
 
 **Parameters:**
+
 - `output_id` (required): The ID from the paginated response
 - `page` (required): Page number to retrieve (1-indexed)
 
 **Returns:**
+
 ```json
 {
   "output_id": "uuid-here",
@@ -165,13 +171,16 @@ The server estimates tokens as `text.length * 0.25`. This is a conservative esti
 ## Dependencies
 
 ### Production
+
 - `@modelcontextprotocol/sdk` - MCP protocol implementation
 
 ### Development
+
 - `typescript` - TypeScript compiler
 - `@types/node` - Node.js type definitions
 
 ### Built-in Modules (No Installation Required)
+
 - `child_process` - Command execution
 - `crypto` - UUID generation
 - `util` - Promise utilities
@@ -179,6 +188,7 @@ The server estimates tokens as `text.length * 0.25`. This is a conservative esti
 ## Architecture
 
 The server maintains two in-memory data structures:
+
 - `outputStorage`: Stores full command outputs for pagination
 - `pagesRead`: Tracks which pages have been retrieved
 
@@ -191,6 +201,7 @@ Storage is automatically cleaned up when all pages of an output have been read.
 1. **Create an npm account** at https://www.npmjs.com/signup if you don't have one
 
 2. **Login to npm** from your terminal:
+
    ```bash
    npm login
    ```
@@ -203,11 +214,13 @@ Storage is automatically cleaned up when all pages of an output have been read.
 ### Publishing
 
 1. **Ensure everything builds**:
+
    ```bash
    npm run build
    ```
 
 2. **Test the package locally**:
+
    ```bash
    npm pack
    # This creates a .tgz file you can test with: npm install -g ./paginate-mcp-1.0.0.tgz
@@ -221,6 +234,7 @@ Storage is automatically cleaned up when all pages of an output have been read.
 ### Publishing Updates
 
 1. **Update version** (use semantic versioning):
+
    ```bash
    npm version patch  # 1.0.0 -> 1.0.1 (bug fixes)
    npm version minor  # 1.0.0 -> 1.1.0 (new features)
@@ -228,6 +242,7 @@ Storage is automatically cleaned up when all pages of an output have been read.
    ```
 
 2. **Publish**:
+
    ```bash
    npm publish
    ```

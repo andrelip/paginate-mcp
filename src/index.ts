@@ -12,7 +12,6 @@ import {
   paginateText,
   executeCommand,
   StoredOutput,
-  PaginationResult,
   MAX_DIRECT_TOKENS,
 } from "./core.js";
 
@@ -73,7 +72,7 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
-  }
+  },
 );
 
 // List Tools Handler
@@ -127,7 +126,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
-function formatCommandOutput(stdout: string, stderr: string, returnCode: number): string {
+function formatCommandOutput(
+  stdout: string,
+  stderr: string,
+  returnCode: number,
+): string {
   return `=== STDOUT ===\n${stdout}\n\n=== STDERR ===\n${stderr}\n\n=== Return Code: ${returnCode} ===`;
 }
 
@@ -139,7 +142,7 @@ function createCompleteResponse(
   fullOutput: string,
   estimatedTokens: number,
   command: string,
-  returnCode: number
+  returnCode: number,
 ): CompleteResponse {
   return {
     status: "complete",
@@ -156,7 +159,7 @@ function storeOutputForPagination(
   fullOutput: string,
   returnCode: number,
   estimatedTokens: number,
-  totalPages: number
+  totalPages: number,
 ): void {
   const totalLines = fullOutput.split("\n").length;
 
@@ -178,7 +181,7 @@ function createPaginatedResponse(
   returnCode: number,
   totalPages: number,
   totalLines: number,
-  estimatedTokens: number
+  estimatedTokens: number,
 ): PaginatedResponse {
   return {
     status: "paginated",
@@ -214,14 +217,19 @@ async function handleRunCommand(args: RunCommandArgs) {
   const { stdout, stderr, returnCode } = await executeCommand(
     command,
     working_directory,
-    timeout
+    timeout,
   );
 
   const fullOutput = formatCommandOutput(stdout, stderr, returnCode);
   const estimatedTokens = estimateTokens(fullOutput);
 
   if (!shouldPaginate(estimatedTokens)) {
-    const response = createCompleteResponse(fullOutput, estimatedTokens, command, returnCode);
+    const response = createCompleteResponse(
+      fullOutput,
+      estimatedTokens,
+      command,
+      returnCode,
+    );
     return createJsonResponse(response);
   }
 
@@ -229,7 +237,14 @@ async function handleRunCommand(args: RunCommandArgs) {
   const { totalPages } = paginateText(fullOutput, 1);
   const totalLines = fullOutput.split("\n").length;
 
-  storeOutputForPagination(outputId, command, fullOutput, returnCode, estimatedTokens, totalPages);
+  storeOutputForPagination(
+    outputId,
+    command,
+    fullOutput,
+    returnCode,
+    estimatedTokens,
+    totalPages,
+  );
 
   const response = createPaginatedResponse(
     outputId,
@@ -237,7 +252,7 @@ async function handleRunCommand(args: RunCommandArgs) {
     returnCode,
     totalPages,
     totalLines,
-    estimatedTokens
+    estimatedTokens,
   );
 
   return createJsonResponse(response);
@@ -248,29 +263,38 @@ function validateOutputExists(outputId: string): StoredOutput {
 
   if (!storedData) {
     throw new Error(
-      `Output ID '${outputId}' not found. It may have expired or been invalid.`
+      `Output ID '${outputId}' not found. It may have expired or been invalid.`,
     );
   }
 
   return storedData;
 }
 
-function validatePageExists(pageContent: string, page: number, totalPages: number): void {
+function validatePageExists(
+  pageContent: string,
+  page: number,
+  totalPages: number,
+): void {
   if (!pageContent && page > 1) {
     throw new Error(`Page ${page} does not exist. Total pages: ${totalPages}`);
   }
 }
 
 function trackPageAsRead(outputId: string, page: number): void {
-  pagesRead.get(outputId)!.add(page);
+  const pages = pagesRead.get(outputId);
+  if (pages) {
+    pages.add(page);
+  }
 }
 
 function haveAllPagesBeenRead(outputId: string, totalPages: number): boolean {
-  return pagesRead.get(outputId)!.size === totalPages;
+  const pages = pagesRead.get(outputId);
+  return pages ? pages.size === totalPages : false;
 }
 
 function getSortedPagesRead(outputId: string): number[] {
-  return Array.from(pagesRead.get(outputId)!).sort((a, b) => a - b);
+  const pages = pagesRead.get(outputId);
+  return pages ? Array.from(pages).sort((a, b) => a - b) : [];
 }
 
 function cleanupStoredOutput(outputId: string): void {
@@ -283,7 +307,7 @@ function buildPageResponse(
   storedData: StoredOutput,
   pageContent: string,
   currentPage: number,
-  allPagesRead: boolean
+  allPagesRead: boolean,
 ): PageResponse {
   const response: PageResponse = {
     output_id: outputId,
@@ -298,7 +322,8 @@ function buildPageResponse(
   };
 
   if (allPagesRead) {
-    response.cleanup_note = "All pages read. Output has been removed from memory.";
+    response.cleanup_note =
+      "All pages read. Output has been removed from memory.";
   }
 
   return response;
@@ -312,13 +337,22 @@ async function handleReadPage(args: ReadPageArgs) {
   }
 
   const storedData = validateOutputExists(outputId);
-  const { content: pageContent, currentPage } = paginateText(storedData.full_output, page);
+  const { content: pageContent, currentPage } = paginateText(
+    storedData.full_output,
+    page,
+  );
 
   validatePageExists(pageContent, page, storedData.total_pages);
   trackPageAsRead(outputId, page);
 
   const allPagesRead = haveAllPagesBeenRead(outputId, storedData.total_pages);
-  const response = buildPageResponse(outputId, storedData, pageContent, currentPage, allPagesRead);
+  const response = buildPageResponse(
+    outputId,
+    storedData,
+    pageContent,
+    currentPage,
+    allPagesRead,
+  );
 
   if (allPagesRead) {
     cleanupStoredOutput(outputId);
@@ -328,11 +362,11 @@ async function handleReadPage(args: ReadPageArgs) {
 }
 
 function isRunCommandArgs(args: unknown): args is RunCommandArgs {
-  return typeof args === 'object' && args !== null && 'command' in args;
+  return typeof args === "object" && args !== null && "command" in args;
 }
 
 function isReadPageArgs(args: unknown): args is ReadPageArgs {
-  return typeof args === 'object' && args !== null && 'output_id' in args;
+  return typeof args === "object" && args !== null && "output_id" in args;
 }
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {

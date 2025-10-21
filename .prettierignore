@@ -1,0 +1,8 @@
+# Ignore artifacts:
+build
+coverage
+dist
+node_modules
+# generated files
+**/pnpm-lock.yaml
+**/snapshots/**
