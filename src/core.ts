@@ -5,7 +5,7 @@ const execAsync = promisify(exec);
 
 export const PAGE_SIZE = 700;
 export const TOKEN_ESTIMATE_RATIO = 0.25;
-export const MAX_DIRECT_TOKENS = 10000;
+export const MAX_DIRECT_TOKENS = 5000;
 export const MAX_CHARS_PER_PAGE = 30000;
 const ONE_GIGABYTE = 1024 * 1024 * 1024;
 const MILLISECONDS_PER_SECOND = 1000;

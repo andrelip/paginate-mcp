@@ -7,7 +7,7 @@ A Model Context Protocol (MCP) server that prevents output truncation when worki
 When running shell commands that produce large outputs (like `git diff`, `git log`, `cat large_file.txt`, or test results), Claude and other AI agents often truncate the output or fail to process the entire content. This leads to incomplete analysis and missed information.
 
 Paginate-MCP solves this by:
-- **Preventing truncation** - Automatically handles outputs exceeding 10,000 tokens
+- **Preventing truncation** - Automatically handles outputs exceeding 5,000 tokens
 - **Preserving full context** - Ensures the agent can access all output through pagination
 - **Seamless integration** - Works transparently with your existing workflows
 
@@ -80,8 +80,8 @@ Execute a shell command and capture its output.
 
 **Returns:**
 
-- If output < 10,000 tokens: Complete output immediately
-- If output > 10,000 tokens: Paginated response with `output_id` for retrieval
+- If output < 5,000 tokens: Complete output immediately
+- If output > 5,000 tokens: Paginated response with `output_id` for retrieval
 
 **Example (small output):**
 
